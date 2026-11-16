@@ -1,7 +1,5 @@
 extends Node3D
-## Polls the native Android MediaPipe bridge. No synthetic landmark source is used.
-## `hands_updated` emits dictionaries containing side, confidence and all 21 landmarks.
-
+## Polls real Android MediaPipe frames. No synthetic landmarks are provided.
 signal hands_updated(hands: Array)
 signal tracking_state_changed(active: bool)
 
@@ -39,13 +37,15 @@ func _process(_delta: float) -> void:
 		_bridge.start_tracking()
 	var frame: Dictionary = _bridge.get_latest_frame()
 	var timestamp := int(frame.get("timestamp_ms", -1))
+	var hands: Array = frame.get("hands", [])
+	var fresh := timestamp >= 0 and float(Time.get_ticks_msec() - timestamp) / 1000.0 <= STALE_AFTER_SECONDS
+	var active := bool(frame.get("camera_active", false)) and fresh and not hands.is_empty()
 	if timestamp != _last_timestamp and timestamp >= 0:
 		_last_timestamp = timestamp
-		var hands: Array = frame.get("hands", [])
-		if not hands.is_empty():
-			hands_updated.emit(hands)
-	var fresh := timestamp >= 0 and float(Time.get_ticks_msec() - timestamp) / 1000.0 <= STALE_AFTER_SECONDS
-	var active := bool(frame.get("camera_active", false)) and fresh and not frame.get("hands", []).is_empty()
+		hands_updated.emit(hands if active else [])
+	elif _was_active and not active:
+		# Send one empty frame on tracking loss so renderers/gestures release stale state.
+		hands_updated.emit([])
 	if active != _was_active:
 		_was_active = active
 		tracking_state_changed.emit(active)

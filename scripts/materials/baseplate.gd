@@ -1,6 +1,12 @@
 extends RefCounted
-## Small generated plate/stud texture; no external asset or runtime download required.
+## Procedural baseplate materials cached per tint/roughness to avoid repeated 128x128 image generation.
+static var _material_cache: Dictionary = {}
+
 static func make(tint: Color, roughness: float = 0.8) -> StandardMaterial3D:
+	var safe_roughness := clampf(roughness, 0.0, 1.0)
+	var cache_key := "%s_%.3f" % [tint.to_html(true), safe_roughness]
+	if _material_cache.has(cache_key):
+		return _material_cache[cache_key]
 	var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	var base := tint.darkened(0.16)
 	var groove := tint.darkened(0.32)
@@ -22,6 +28,7 @@ static func make(tint: Color, roughness: float = 0.8) -> StandardMaterial3D:
 			image.set_pixel(x, y, color)
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = ImageTexture.create_from_image(image)
-	material.roughness = roughness
+	material.roughness = safe_roughness
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	_material_cache[cache_key] = material
 	return material

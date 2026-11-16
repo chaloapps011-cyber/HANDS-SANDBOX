@@ -10,6 +10,7 @@ const HandTrackingModule = preload("res://scripts/input/hand_tracking_bridge.gd"
 const GestureInteraction = preload("res://scripts/gestures/gesture_interaction.gd")
 const WorldMenu = preload("res://scripts/ui/world_menu_3d.gd")
 const VRBoxStereo = preload("res://scripts/vr/vr_box_stereo.gd")
+const AnimatedSkyShader = preload("res://shaders/animated_cloud_sky.gdshader")
 
 var selected_object: RigidBody3D
 var gravity_enabled := true
@@ -50,18 +51,21 @@ func _build_environment() -> void:
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_SKY
 	environment.sky = Sky.new()
-	environment.sky.sky_material = ProceduralSkyMaterial.new()
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.58, 0.63, 0.72)
-	environment.ambient_light_energy = 0.55
+	var sky_material := ShaderMaterial.new()
+	sky_material.shader = AnimatedSkyShader
+	environment.sky.sky_material = sky_material
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	environment.ambient_light_energy = 0.62
+	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	environment_node.environment = environment
 	add_child(environment_node)
+
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-52, -32, 0)
-	sun.light_color = Color(1.0, 0.91, 0.78)
-	sun.light_energy = 1.15
+	sun.light_color = Color(1.0, 0.93, 0.82)
+	sun.light_energy = 1.05
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 35.0
+	sun.directional_shadow_max_distance = 24.0
 	add_child(sun)
 
 func _add_block(at: Vector3, tint: Color) -> void:
@@ -99,7 +103,6 @@ func select_object(body: RigidBody3D) -> void:
 	if body.is_in_group("sandbox_objects") and body not in _grouped_objects:
 		_grouped_objects.append(body)
 
-## Existing safe physics constraints grouping is preserved.
 func group_selected_objects() -> void:
 	_grouped_objects = _valid_group_members()
 	if _grouped_objects.size() < 2:
