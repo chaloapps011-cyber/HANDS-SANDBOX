@@ -1,5 +1,4 @@
-; HANDS SANDBOX — Etapa 001
-; Godot 4.x, renderer Mobile
+; HANDS SANDBOX — Godot 4.x, renderer Mobile
 config_version=5
 
 [application]
@@ -10,6 +9,7 @@ config/features=PackedStringArray("4.3", "GL Compatibility")
 [display]
 window/size/viewport_width=1280
 window/size/viewport_height=720
+; Android orientation: 1 = landscape.
 window/handheld/orientation=1
 
 [rendering]

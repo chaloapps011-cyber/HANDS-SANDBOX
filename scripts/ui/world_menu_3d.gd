@@ -1,12 +1,11 @@
 extends Node3D
-## Functional world-space menu. Input is tested by a camera ray against 3D button colliders.
+## Functional 3D world-space menu; ray queries target menu button colliders.
 const PhysicalObject = preload("res://scripts/objects/physical_object.gd")
-
+const IPD_STEP := 0.001
 var world: Node3D
 var camera: Camera3D
 var current_page := "main"
 var _button_root: Node3D
-var _process_mode_before_pause := Node.PROCESS_MODE_INHERIT
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -54,8 +53,11 @@ func show_page(page: String) -> void:
 			_add_button("Agrupar", "tool_group", Vector3(0, -0.36, 0))
 			_add_button("Voltar", "main", Vector3(0, -0.70, 0))
 		"settings":
-			_add_button("Gravidade alternar", "toggle_gravity", Vector3(0, 0.15, 0))
-			_add_button("Voltar", "main", Vector3(0, -0.25, 0))
+			_add_button("VR Box: alternar", "toggle_vr", Vector3(0, 0.24, 0))
+			_add_button("Separação dos olhos -", "ipd_minus", Vector3(0, 0.02, 0))
+			_add_button("Separação dos olhos +", "ipd_plus", Vector3(0, -0.20, 0))
+			_add_button("Gravidade alternar", "toggle_gravity", Vector3(0, -0.42, 0))
+			_add_button("Voltar", "main", Vector3(0, -0.68, 0))
 		"properties":
 			_add_properties()
 			_add_button("Voltar", "main", Vector3(0, -0.84, 0))
@@ -144,6 +146,14 @@ func _accept_event(action: String) -> void:
 		"resume":
 			get_tree().paused = false
 			show_page("main")
+		"toggle_vr":
+			if world != null and world.vr_manager != null:
+				world.vr_manager.toggle_vr()
+			show_page("settings")
+		"ipd_minus", "ipd_plus":
+			if world != null and world.vr_manager != null:
+				world.vr_manager.adjust_ipd(-IPD_STEP if action == "ipd_minus" else IPD_STEP)
+			show_page("settings")
 		"toggle_gravity":
 			if world != null:
 				world.gravity_enabled = not world.gravity_enabled

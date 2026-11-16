@@ -1,5 +1,5 @@
 extends Node3D
-## Stage 001-004 world, physical grouping, and tracked-hand interactions.
+## Stage 001-004 world, physical grouping, tracked-hand interactions and optional VR Box stereo.
 const FloorModule = preload("res://scripts/world/floor.gd")
 const TableModule = preload("res://scripts/world/table.gd")
 const PlayerModule = preload("res://scripts/player/player_controller.gd")
@@ -9,10 +9,12 @@ const PhysicalObjectModule = preload("res://scripts/objects/physical_object.gd")
 const HandTrackingModule = preload("res://scripts/input/hand_tracking_bridge.gd")
 const GestureInteraction = preload("res://scripts/gestures/gesture_interaction.gd")
 const WorldMenu = preload("res://scripts/ui/world_menu_3d.gd")
+const VRBoxStereo = preload("res://scripts/vr/vr_box_stereo.gd")
 
 var selected_object: RigidBody3D
 var gravity_enabled := true
 var active_tool := "select"
+var vr_manager: Node
 var _grouped_objects: Array[RigidBody3D] = []
 var _group_counter := 1
 var _interaction: Node
@@ -35,6 +37,9 @@ func _ready() -> void:
 	_interaction.tracking_source = tracking
 	_interaction.world = self
 	add_child(_interaction)
+	vr_manager = VRBoxStereo.new()
+	vr_manager.source_camera = player.get_node("Camera3D")
+	add_child(vr_manager)
 	var menu := WorldMenu.new()
 	menu.world = self
 	menu.camera = player.get_node("Camera3D")
@@ -94,8 +99,7 @@ func select_object(body: RigidBody3D) -> void:
 	if body.is_in_group("sandbox_objects") and body not in _grouped_objects:
 		_grouped_objects.append(body)
 
-## Group rigid bodies using pin constraints, never by reparenting them mid-simulation.
-## Joint creation is deferred so the physics space is not modified during a query/callback.
+## Existing safe physics constraints grouping is preserved.
 func group_selected_objects() -> void:
 	_grouped_objects = _valid_group_members()
 	if _grouped_objects.size() < 2:
@@ -122,7 +126,6 @@ func _create_group_constraints(members: Array[RigidBody3D], group_id: String) ->
 			return
 		body.set_meta("physical_group_id", group_id)
 		body.add_to_group(group_id)
-	# A spanning chain of pin joints preserves each body's world transform and lets each remain a RigidBody.
 	for index in range(1, members.size()):
 		var a := members[index - 1]
 		var b := members[index]
