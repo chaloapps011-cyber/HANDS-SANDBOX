@@ -1,31 +1,27 @@
-# HANDS SANDBOX — Etapa 001: Fundação do jogo
+# HANDS SANDBOX — Etapa 002: Sistema de ragdoll
 
-Primeira fundação jogável em Godot 4 para Android, com cenário 3D leve e organizado em módulos. O protótipo entrega chão cinza e mesa em tom laranja com padrão de placas e pinos, iluminação/sombras, câmera em primeira pessoa, colisões e blocos rígidos que podem ser empurrados.
+Projeto Godot 4.x para Android, com a fundação da Etapa 001 preservada e um sistema de ragdoll humanoide articulado por física.
 
-## Estrutura
+## Etapa 002
 
-- `scenes/main.tscn` — cena inicial.
-- `scripts/world/main_world.gd` — composição do ambiente.
-- `scripts/world/floor.gd` — piso estático e colisão.
-- `scripts/world/table.gd` — mesa modular com colisores.
-- `scripts/player/player_controller.gd` — câmera e locomoção em primeira pessoa.
-- `scripts/objects/physical_block.gd` — objeto físico reutilizável.
-- `scripts/materials/baseplate.gd` — textura procedural compartilhada.
+- Boneco amarelo composto por cabeça, tronco, pelve, braços, antebraços, mãos, coxas, pernas e pés, usando cápsulas arredondadas.
+- Cada segmento é um `RigidBody3D` com massa própria, gravidade do mundo, colisão, amortecimento e material físico.
+- `ConeTwistJoint3D` conecta segmentos com limites de balanço e torção; segmentos vizinhos ignoram colisão para evitar conflito nas juntas, mas continuam colidindo com o cenário e demais objetos.
+- Um ragdoll é adicionado ao iniciar, fora da mesa; a função `spawn_ragdoll(at: Vector3)` permite criar múltiplos exemplares com física independente.
+- `apply_impact(impulse, world_position)` oferece um ponto de entrada para aplicar um impacto ao segmento mais próximo.
 
-## Executar
+## Estrutura relevante
 
-1. Instale Godot 4.3 ou superior.
-2. Abra `project.godot` no Godot e execute a cena principal (F6/F5).
-3. Desktop: WASD para andar, mouse para olhar; clique na janela para capturar o mouse e Escape para liberar.
-4. Tela tátil: arraste no lado esquerdo para andar e no lado direito para olhar. Não há widgets 2D.
-5. Android: configure o export template Android no Godot, crie um preset Android e exporte o projeto. O renderer Mobile/Compatibility foi selecionado para aparelhos modestos.
+- `scripts/objects/ragdoll.gd` — construção do corpo, cápsulas físicas, juntas e entrada de impacto.
+- `scripts/world/main_world.gd` — composição do mundo e fábrica pública `spawn_ragdoll`.
+- `scenes/main.tscn` — cena inicial da Etapa 001, mantida sem alterações.
 
-## Limites desta etapa
+## Executar e validar
 
-- VR Box é um visor passivo: esta etapa oferece somente visualização monocular normal. Renderização estereoscópica requer integração XR dedicada e deve ser validada em etapa posterior.
-- Não existe hand tracking, mãos virtuais, esqueleto, ragdoll ou interface 3D implementados nesta etapa. A arquitetura separa player, mundo e objetos para permitir integração futura real sem simular recursos ausentes.
-- O padrão de placas é gerado localmente em runtime, sem download de assets.
+Abra `project.godot` no Godot 4.3+ e execute a cena principal. Verifique que o ragdoll amarelo cai e repousa no chão, que os segmentos permanecem ligados, e que o chão, mesa e blocos da Etapa 001 continuam presentes. Para testar novos exemplares, chame `spawn_ragdoll(Vector3(x, 0, z))` no nó do mundo. Para impactos, chame `apply_impact(Vector3(0, 0, -4), ponto_global)` no ragdoll.
 
-## Validação
+A quantidade de corpos rígidos por ragdoll é limitada para desempenho em Android; evite instanciar muitos simultaneamente em aparelhos modestos. A execução/exportação em dispositivo Android ainda precisa ser validada com o SDK e templates locais.
 
-Importe e execute no Godot 4.3+; confirme o piso, mesa, blocos, iluminação e controle em desktop/touch. A exportação Android final depende de SDK/JDK e templates configurados no ambiente do desenvolvedor. Nenhuma validação em dispositivo físico foi executada neste commit.
+## Fora do escopo
+
+Sem sangue, desmembramento, animação falsa, hand tracking ou alterações no piso, mesa, iluminação e controles da Etapa 001. Cada parte é realmente simulada pela física, não é uma pose animada.

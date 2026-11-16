@@ -1,10 +1,11 @@
 extends Node3D
-## Assembles Etapa 001 from independent world modules.
+## Stage 001 environment assembly plus the Stage 002 ragdoll spawn entry point.
 
 const FloorModule = preload("res://scripts/world/floor.gd")
 const TableModule = preload("res://scripts/world/table.gd")
 const PlayerModule = preload("res://scripts/player/player_controller.gd")
 const BlockModule = preload("res://scripts/objects/physical_block.gd")
+const RagdollModule = preload("res://scripts/objects/ragdoll.gd")
 
 func _ready() -> void:
 	_build_environment()
@@ -18,6 +19,7 @@ func _ready() -> void:
 	_add_block(Vector3(0.0, 1.15, 0.0), Color(0.78, 0.30, 0.18))
 	_add_block(Vector3(0.32, 1.15, 0.0), Color(0.22, 0.48, 0.72))
 	_add_block(Vector3(0.0, 2.15, 0.0), Color(0.80, 0.68, 0.24))
+	spawn_ragdoll(Vector3(3.2, 0, 0))
 
 func _build_environment() -> void:
 	var environment_node := WorldEnvironment.new()
@@ -44,3 +46,10 @@ func _add_block(at: Vector3, tint: Color) -> void:
 	block.position = at
 	block.tint = tint
 	add_child(block)
+
+## Public factory: each call adds a completely independent articulated ragdoll.
+func spawn_ragdoll(at: Vector3) -> Node3D:
+	var ragdoll: Node3D = RagdollModule.new()
+	ragdoll.position = at
+	add_child(ragdoll)
+	return ragdoll
