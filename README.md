@@ -1,32 +1,28 @@
-# HANDS SANDBOX — Etapa 003: Objetos e construção
+# HANDS SANDBOX — Etapas 001–004 (integração em andamento)
 
-Projeto Godot 4.x para Android, com as etapas anteriores preservadas e um sistema modular para criar e empilhar objetos físicos.
+Godot 4.x / Android. Preserva o ambiente 3D da Etapa 001, o ragdoll físico da Etapa 002 e a fábrica de objetos da Etapa 003. A Etapa 004 adiciona a fonte nativa Android para rastreamento real via câmera frontal, CameraX e MediaPipe Tasks; sua ativação depende da montagem e validação do plugin Android descritas em `android/README.md`.
 
-## Sistema de objetos
+## Recursos preservados
 
-- Formas disponíveis: cubo, esfera, cilindro e bloco com material de placa de base.
-- Cada instância é um `RigidBody3D` com gravidade, colisão, massa, atrito e elasticidade configuráveis.
-- Tamanho, rotação, posição e cor podem ser definidos na criação; objetos mantêm corpo físico e identificação únicos (`sandbox_object_id`), também agrupados em `sandbox_objects`.
-- O material de placa é procedural e compartilhado com o piso/mesa; os demais materiais permitem escolher cor e rugosidade.
-- Ao iniciar há uma pequena pilha de demonstração de quatro formas.
+- Chão cinza e mesa laranja com materiais de placa de base, iluminação, câmera em primeira pessoa e física.
+- Ragdoll amarelo articulado por corpos rígidos e juntas físicas.
+- Cubos, esferas, cilindros e blocos de placa de base configuráveis, identificados individualmente e empilháveis; teclas 1–4 continuam criando objetos no desktop.
 
-## Criar objetos
+## Rastreamento de mãos Android
 
-- Teclas `1`, `2`, `3` e `4` criam, respectivamente, cubo, esfera, cilindro e bloco de placa de base à frente da câmera; o objeto cai e colide com o cenário.
-- Código/sistemas posteriores podem criar objetos chamando `spawn_physical_object(shape_type, posição, rotação, tamanho, cor, massa, atrito, elasticidade, usar_placa)` no nó do mundo. Os tipos estão em `PhysicalObjectModule.ShapeType` em `scripts/objects/physical_object.gd`.
-- A fábrica é uma API de criação, não uma GUI; não há controles 2D nem hand tracking nesta etapa. Em aparelhos sem teclado, a criação pode ser chamada por código até ser conectada a um input apropriado em uma etapa futura.
+A integração nativa utiliza a câmera frontal real e MediaPipe Hand Landmarker para até duas mãos, com 21 landmarks por mão, lado, confiança e coordenadas normalizadas. A API entrega esses dados pelo singleton `HandsTracking` e pelo sinal `hands_updated`. Frames antigos são descartados após perda temporária; o pequeno indicador 3D muda para verde apenas quando há uma detecção recente.
 
-## Estrutura relevante
+A integração requer modelo `.task`, AAR de API Godot correspondente à versão, custom Android build, permissão de câmera e teste em dispositivo. Consulte `android/README.md`. Não há fallback de landmarks simulados: em builds sem plugin o rastreamento permanece indisponível. Modelos 3D das mãos e seleção/manipulação de objetos ainda não são implementados; os dados e IDs dos objetos permitem integração posterior.
 
-- `scripts/objects/physical_object.gd` — forma, renderização, identificação e parâmetros físicos de cada objeto.
-- `scripts/world/main_world.gd` — fábrica pública e demonstração de empilhamento.
-- `scripts/objects/ragdoll.gd` — ragdoll articulado da Etapa 002.
-- `scripts/world/floor.gd` e `scripts/world/table.gd` — cenário da Etapa 001, sem mudanças.
+## Execução
 
-## Executar e validar
+Abra `project.godot` com Godot 4.3+. Desktop continua executando os sistemas físicos existentes, mas não possui hand tracking. Para Android, siga os passos e limitações de `android/README.md`; não considere o rastreamento funcional até validar instalação, permissão, detecção esquerda/direita e perda de sinal em um aparelho real.
 
-Abra `project.godot` no Godot 4.3+ e execute a cena principal. Verifique a pilha demonstrativa, colisões no piso/mesa e criação pelas teclas `1`–`4`. Confirme que cada objeto cai, colide, empilha e pode ser identificado por `get_meta("sandbox_object_id")`. A exportação Android e desempenho precisam ser confirmados no dispositivo alvo; mantenha a quantidade de corpos rígidos moderada.
+## Arquivos novos
 
-## Limites
+- `scripts/input/hand_tracking_bridge.gd` — interface GDScript, emissão de dados e indicador 3D baseado em detecção real.
+- `android/plugins/hands_tracking/` — código do plugin Android CameraX/MediaPipe e manifesto.
+- `android/download_hand_landmarker_model.sh` — obtém o modelo oficial durante configuração, fora do commit.
+- `android/README.md` — dependências, integração e limitações.
 
-Sem hand tracking, GUI 2D ou mecânicas adicionais. A fundação visual e controles das etapas anteriores permanecem preservados.
+Não há modelo binário ou AAR comitados. Isso evita incluir binários não verificados e versões de API incompatíveis.

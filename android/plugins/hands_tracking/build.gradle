@@ -1,0 +1,29 @@
+plugins {
+    id 'com.android.library' version '8.7.3'
+    id 'org.jetbrains.kotlin.android' version '2.0.21'
+}
+
+android {
+    namespace 'org.hands_sandbox.tracking'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 23
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+
+dependencies {
+    // Put the Godot Android plugin API AAR from the matching Godot 4.3+ export template in libs/.
+    compileOnly files('libs/godot-lib.aar')
+    implementation 'androidx.camera:camera-core:1.4.2'
+    implementation 'androidx.camera:camera-camera2:1.4.2'
+    implementation 'androidx.camera:camera-lifecycle:1.4.2'
+    implementation 'com.google.mediapipe:tasks-vision:0.10.21'
+}
