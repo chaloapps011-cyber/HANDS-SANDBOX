@@ -1,27 +1,32 @@
-# HANDS SANDBOX — Etapa 002: Sistema de ragdoll
+# HANDS SANDBOX — Etapa 003: Objetos e construção
 
-Projeto Godot 4.x para Android, com a fundação da Etapa 001 preservada e um sistema de ragdoll humanoide articulado por física.
+Projeto Godot 4.x para Android, com as etapas anteriores preservadas e um sistema modular para criar e empilhar objetos físicos.
 
-## Etapa 002
+## Sistema de objetos
 
-- Boneco amarelo composto por cabeça, tronco, pelve, braços, antebraços, mãos, coxas, pernas e pés, usando cápsulas arredondadas.
-- Cada segmento é um `RigidBody3D` com massa própria, gravidade do mundo, colisão, amortecimento e material físico.
-- `ConeTwistJoint3D` conecta segmentos com limites de balanço e torção; segmentos vizinhos ignoram colisão para evitar conflito nas juntas, mas continuam colidindo com o cenário e demais objetos.
-- Um ragdoll é adicionado ao iniciar, fora da mesa; a função `spawn_ragdoll(at: Vector3)` permite criar múltiplos exemplares com física independente.
-- `apply_impact(impulse, world_position)` oferece um ponto de entrada para aplicar um impacto ao segmento mais próximo.
+- Formas disponíveis: cubo, esfera, cilindro e bloco com material de placa de base.
+- Cada instância é um `RigidBody3D` com gravidade, colisão, massa, atrito e elasticidade configuráveis.
+- Tamanho, rotação, posição e cor podem ser definidos na criação; objetos mantêm corpo físico e identificação únicos (`sandbox_object_id`), também agrupados em `sandbox_objects`.
+- O material de placa é procedural e compartilhado com o piso/mesa; os demais materiais permitem escolher cor e rugosidade.
+- Ao iniciar há uma pequena pilha de demonstração de quatro formas.
+
+## Criar objetos
+
+- Teclas `1`, `2`, `3` e `4` criam, respectivamente, cubo, esfera, cilindro e bloco de placa de base à frente da câmera; o objeto cai e colide com o cenário.
+- Código/sistemas posteriores podem criar objetos chamando `spawn_physical_object(shape_type, posição, rotação, tamanho, cor, massa, atrito, elasticidade, usar_placa)` no nó do mundo. Os tipos estão em `PhysicalObjectModule.ShapeType` em `scripts/objects/physical_object.gd`.
+- A fábrica é uma API de criação, não uma GUI; não há controles 2D nem hand tracking nesta etapa. Em aparelhos sem teclado, a criação pode ser chamada por código até ser conectada a um input apropriado em uma etapa futura.
 
 ## Estrutura relevante
 
-- `scripts/objects/ragdoll.gd` — construção do corpo, cápsulas físicas, juntas e entrada de impacto.
-- `scripts/world/main_world.gd` — composição do mundo e fábrica pública `spawn_ragdoll`.
-- `scenes/main.tscn` — cena inicial da Etapa 001, mantida sem alterações.
+- `scripts/objects/physical_object.gd` — forma, renderização, identificação e parâmetros físicos de cada objeto.
+- `scripts/world/main_world.gd` — fábrica pública e demonstração de empilhamento.
+- `scripts/objects/ragdoll.gd` — ragdoll articulado da Etapa 002.
+- `scripts/world/floor.gd` e `scripts/world/table.gd` — cenário da Etapa 001, sem mudanças.
 
 ## Executar e validar
 
-Abra `project.godot` no Godot 4.3+ e execute a cena principal. Verifique que o ragdoll amarelo cai e repousa no chão, que os segmentos permanecem ligados, e que o chão, mesa e blocos da Etapa 001 continuam presentes. Para testar novos exemplares, chame `spawn_ragdoll(Vector3(x, 0, z))` no nó do mundo. Para impactos, chame `apply_impact(Vector3(0, 0, -4), ponto_global)` no ragdoll.
+Abra `project.godot` no Godot 4.3+ e execute a cena principal. Verifique a pilha demonstrativa, colisões no piso/mesa e criação pelas teclas `1`–`4`. Confirme que cada objeto cai, colide, empilha e pode ser identificado por `get_meta("sandbox_object_id")`. A exportação Android e desempenho precisam ser confirmados no dispositivo alvo; mantenha a quantidade de corpos rígidos moderada.
 
-A quantidade de corpos rígidos por ragdoll é limitada para desempenho em Android; evite instanciar muitos simultaneamente em aparelhos modestos. A execução/exportação em dispositivo Android ainda precisa ser validada com o SDK e templates locais.
+## Limites
 
-## Fora do escopo
-
-Sem sangue, desmembramento, animação falsa, hand tracking ou alterações no piso, mesa, iluminação e controles da Etapa 001. Cada parte é realmente simulada pela física, não é uma pose animada.
+Sem hand tracking, GUI 2D ou mecânicas adicionais. A fundação visual e controles das etapas anteriores permanecem preservados.
