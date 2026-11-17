@@ -1,4 +1,3 @@
-
 name: HANDS SANDBOX Android Build
 
 on:
@@ -11,12 +10,19 @@ jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      GODOT_VERSION: 4.4.1
+      ANDROID_NDK_VERSION: 23.2.8568313
+      ANDROID_BUILD_TOOLS_VERSION: 35.0.1
+      ANDROID_PLATFORM_VERSION: 35
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -24,32 +30,75 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Explicit package list overrides the action's obsolete default "tools" package.
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.1
+            ndk;23.2.8568313
+            cmake;3.10.2.4988404
 
-      - name: Install Android SDK packages
+      - name: Verify Android toolchain
         shell: bash
         run: |
-          set -e
+          set -Eeuo pipefail
+          trap 'status=$?; echo "Android toolchain verification failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
 
-          echo "Android SDK: $ANDROID_HOME"
-          echo "Java SDK: $JAVA_HOME"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+          {
+            echo "JAVA_HOME=$JAVA_HOME"
+            echo "ANDROID_HOME=$ANDROID_HOME"
+            echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+            java -version
+            "$ANDROID_HOME/platform-tools/adb" version
+            "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION/aapt" version
+            test -d "$ANDROID_HOME/platforms/android-$ANDROID_PLATFORM_VERSION"
+            test -x "$ANDROID_NDK_HOME/ndk-build"
+            test -d "$ANDROID_HOME/cmake/3.10.2.4988404"
+          }
 
-          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+      - name: Setup Godot 4.4.1
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
 
-          sdkmanager --sdk_root="$ANDROID_HOME" \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "cmdline-tools;latest" \
-            "ndk;23.2.8568313" \
-            "cmake;3.10.2.4988404"
-
-      - name: Configure Godot Android paths
+      - name: Install official Godot export templates
         shell: bash
         run: |
-          set -e
+          set -Eeuo pipefail
+          trap 'status=$?; echo "Godot export template installation failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
+
+          templates_version="4.4.1.stable"
+          templates_dir="$HOME/.local/share/godot/export_templates/$templates_version"
+          archive="$RUNNER_TEMP/Godot_v4.4.1-stable_export_templates.tpz"
+          extracted="$RUNNER_TEMP/godot-export-templates"
+
+          mkdir -p "$extracted" "$templates_dir"
+          curl --fail --location --retry 3 --show-error \
+            "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" \
+            --output "$archive"
+          unzip -o "$archive" -d "$extracted"
+          test -d "$extracted/templates"
+          cp -av "$extracted/templates/." "$templates_dir/"
+
+          for template in android_debug.apk android_release.apk; do
+            if [[ ! -s "$templates_dir/$template" ]]; then
+              echo "Required template missing or empty: $templates_dir/$template" >&2
+              find "$templates_dir" -maxdepth 1 -type f -printf '%f (%s bytes)\n' >&2 || true
+              exit 1
+            fi
+            echo "Verified $templates_dir/$template ($(stat -c '%s' "$templates_dir/$template") bytes)"
+          done
+
+      - name: Configure Godot Android SDK paths
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'status=$?; echo "Godot Android path configuration failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
 
           mkdir -p "$HOME/.config/godot"
-
           cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
@@ -57,57 +106,41 @@ jobs:
           export/android/java_sdk_path = "$JAVA_HOME"
           export/android/android_sdk_path = "$ANDROID_HOME"
           EOF
-
           cat "$HOME/.config/godot/editor_settings-4.4.tres"
+          godot --version
 
-      - name: Setup Godot
-        uses: chickensoft-games/setup-godot@v2
-        with:
-          version: 4.4.1
-          use-dotnet: false
-
-      - name: Install Godot export templates
+      - name: Validate Android export preset
         shell: bash
         run: |
-          set -e
+          set -Eeuo pipefail
+          trap 'status=$?; echo "Android preset validation failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
 
-          VERSION="4.4.1.stable"
-          DEST="$HOME/.local/share/godot/export_templates/$VERSION"
+          grep -Fx 'name="Android"' export_presets.cfg
+          grep -Fx 'platform="Android"' export_presets.cfg
+          grep -Fx 'architectures/arm64-v8a=true' export_presets.cfg
+          grep -Fx 'package/unique_name="com.chaloapps.handsandbox"' export_presets.cfg
+          echo "Android preset name, package ID, and arm64-v8a architecture verified."
 
-          mkdir -p "$RUNNER_TEMP/templates" "$DEST"
-
-          curl --fail --location --retry 3 \
-            "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" \
-            -o "$RUNNER_TEMP/templates.tpz"
-
-          unzip -o "$RUNNER_TEMP/templates.tpz" \
-            -d "$RUNNER_TEMP/templates"
-
-          cp -a "$RUNNER_TEMP/templates/templates/." "$DEST/"
-
-          test -s "$DEST/android_debug.apk"
-          test -s "$DEST/android_release.apk"
-
-          echo "Godot Android templates installed."
-
-      - name: Export APK
+      - name: Export release APK
         shell: bash
         run: |
-          set -e
+          set -Eeuo pipefail
+          trap 'status=$?; echo "Godot Android release export failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
 
           mkdir -p build
-
           godot --headless --verbose --path . \
-            --export-debug "Android" \
+            --export-release "Android" \
             build/HANDS_SANDBOX.apk
 
           test -s build/HANDS_SANDBOX.apk
+          file build/HANDS_SANDBOX.apk
+          sha256sum build/HANDS_SANDBOX.apk
+          echo "Release APK successfully generated."
 
-          echo "APK generated successfully."
-
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: HANDS-SANDBOX-APK
           path: build/HANDS_SANDBOX.apk
           if-no-files-found: error
+          compression-level: 0
