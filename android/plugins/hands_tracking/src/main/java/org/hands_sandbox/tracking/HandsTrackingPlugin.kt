@@ -1,5 +1,8 @@
-extends org.godotengine.godot.plugin.GodotPlugin
+package org.hands_sandbox.tracking
 
+import org.godotengine.godot.GodotPlugin
+import org.godotengine.godot.Godot
+import org.godotengine.godot.plugin.UsedByGodot
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -15,12 +18,10 @@ import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarker
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
-import org.godotengine.godot.Godot
-import org.godotengine.godot.plugin.UsedByGodot
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
-/** Native CameraX + MediaPipe Tasks bridge. It reports camera landmarks; it draws no fake hands. */
+/** CameraX and MediaPipe integration. Camera permission is requested by the Godot startup screen. */
 class HandsTrackingPlugin(godot: Godot) : GodotPlugin(godot) {
     private val cameraExecutor = Executors.newSingleThreadExecutor()
     private val latestFrame = AtomicReference<Map<String, Any>>(emptyMap())
@@ -51,10 +52,7 @@ class HandsTrackingPlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     fun startTracking(): Boolean {
-        if (!hasCameraPermission()) {
-            requestCameraPermission()
-            return false
-        }
+        if (!hasCameraPermission()) return false
         if (cameraRunning) return true
         cameraExecutor.execute {
             try {
@@ -104,7 +102,6 @@ class HandsTrackingPlugin(godot: Godot) : GodotPlugin(godot) {
             if (upright !== source) source.recycle()
             val image = BitmapImageBuilder(upright).build()
             handLandmarker?.detectAsync(image, SystemClock.uptimeMillis())
-            // MediaPipe consumes the bitmap-backed MPImage asynchronously; callback owns it until inference completes.
         } catch (error: Exception) {
             publishError(error)
         } finally {
@@ -115,22 +112,11 @@ class HandsTrackingPlugin(godot: Godot) : GodotPlugin(godot) {
     private fun onLandmarks(result: HandLandmarkerResult, input: com.google.mediapipe.framework.image.MPImage) {
         val sides = result.handedness()
         val hands = result.landmarks().mapIndexed { handIndex, points ->
-            val categories = sides.getOrNull(handIndex).orEmpty()
-            val category = categories.firstOrNull()
-            val landmarks = points.map { point ->
-                mapOf("x" to point.x().toDouble(), "y" to point.y().toDouble(), "z" to point.z().toDouble())
-            }
-            mapOf(
-                "side" to (category?.categoryName() ?: "Unknown"),
-                "confidence" to (category?.score()?.toDouble() ?: 0.0),
-                "landmarks" to landmarks
-            )
+            val category = sides.getOrNull(handIndex).orEmpty().firstOrNull()
+            val landmarks = points.map { point -> mapOf("x" to point.x().toDouble(), "y" to point.y().toDouble(), "z" to point.z().toDouble()) }
+            mapOf("side" to (category?.categoryName() ?: "Unknown"), "confidence" to (category?.score()?.toDouble() ?: 0.0), "landmarks" to landmarks)
         }
-        latestFrame.set(mapOf(
-            "timestamp_ms" to result.timestampMs(),
-            "camera_active" to cameraRunning,
-            "hands" to hands
-        ))
+        latestFrame.set(mapOf("timestamp_ms" to result.timestampMs(), "camera_active" to cameraRunning, "hands" to hands))
     }
 
     @UsedByGodot
@@ -156,12 +142,7 @@ class HandsTrackingPlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     private fun publishError(error: Exception) {
-        latestFrame.set(mapOf(
-            "timestamp_ms" to SystemClock.uptimeMillis(),
-            "camera_active" to false,
-            "hands" to emptyList<Map<String, Any>>(),
-            "error" to (error.message ?: error.javaClass.simpleName)
-        ))
+        latestFrame.set(mapOf("timestamp_ms" to SystemClock.uptimeMillis(), "camera_active" to false, "hands" to emptyList<Map<String, Any>>(), "error" to (error.message ?: error.javaClass.simpleName)))
         cameraRunning = false
     }
 

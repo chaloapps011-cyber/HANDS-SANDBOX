@@ -1,5 +1,5 @@
 extends Node3D
-## Polls real Android MediaPipe frames. No synthetic landmarks are provided.
+## Polls real Android MediaPipe frames. Permission is requested by the startup screen.
 signal hands_updated(hands: Array)
 signal tracking_state_changed(active: bool)
 
@@ -12,7 +12,6 @@ var _was_active := false
 var _indicator: MeshInstance3D
 var _indicator_material: StandardMaterial3D
 var _camera: Camera3D
-var _permission_request_started := false
 
 func _ready() -> void:
 	_create_world_indicator()
@@ -23,18 +22,12 @@ func _ready() -> void:
 		push_warning("Native HandsTracking plugin is not installed in this Android export. Tracking remains unavailable.")
 		return
 	_bridge = Engine.get_singleton(HANDS_TRACKING_SINGLETON)
-	set_process(true)
 	if _bridge.has_camera_permission():
 		_bridge.start_tracking()
-	else:
-		_bridge.request_camera_permission()
-		_permission_request_started = true
 
 func _process(_delta: float) -> void:
 	if _bridge == null:
 		return
-	if _permission_request_started and _bridge.has_camera_permission() and not _bridge.is_camera_running():
-		_bridge.start_tracking()
 	var frame: Dictionary = _bridge.get_latest_frame()
 	var timestamp := int(frame.get("timestamp_ms", -1))
 	var hands: Array = frame.get("hands", [])
@@ -44,7 +37,6 @@ func _process(_delta: float) -> void:
 		_last_timestamp = timestamp
 		hands_updated.emit(hands if active else [])
 	elif _was_active and not active:
-		# Send one empty frame on tracking loss so renderers/gestures release stale state.
 		hands_updated.emit([])
 	if active != _was_active:
 		_was_active = active
