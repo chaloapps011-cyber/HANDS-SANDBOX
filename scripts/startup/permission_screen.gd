@@ -1,6 +1,6 @@
 extends CanvasLayer
 ## First-launch Android permission explanation. Camera is requested only after explicit Continue.
-## Microphone is displayed as optional/not used and is never requested by this project.
+## Microphone is informational only and is never requested.
 signal completed
 
 const TRACKING_SINGLETON := "HandsTracking"
@@ -14,7 +14,8 @@ var _plugin: Object
 var _camera_request_pending := false
 var _request_elapsed := 0.0
 var _finished := false
-var _first_run := false
+var _camera_request_attempted := false
+var _continue_without_camera := false
 
 func _ready() -> void:
 	layer = 100
@@ -22,10 +23,8 @@ func _ready() -> void:
 	if Engine.has_singleton(TRACKING_SINGLETON):
 		_plugin = Engine.get_singleton(TRACKING_SINGLETON)
 	_update_states()
-	_first_run = not _has_completed_intro()
-	if not _first_run and _camera_is_granted():
-		_finish()
-	elif not _first_run and _plugin == null:
+	# Skip the intro on later launches only when camera access is already granted.
+	if _has_completed_intro() and _camera_is_granted():
 		_finish()
 
 func _process(delta: float) -> void:
@@ -36,10 +35,13 @@ func _process(delta: float) -> void:
 	if _camera_is_granted():
 		_finish()
 	elif _request_elapsed >= REQUEST_WAIT_SECONDS:
+		# Android does not expose a reliable denied-vs-dialog-open status through this bridge.
+		# Keep the user in control and offer an explicit continue-without-camera option.
 		_camera_request_pending = false
+		_continue_without_camera = true
 		_continue_button.disabled = false
 		_continue_button.text = "Continuar sem câmera"
-		_camera_state.text = "Negada ou não concedida"
+		_camera_state.text = "Não concedida; o rastreamento ficará indisponível"
 
 func _build_screen() -> void:
 	var background := ColorRect.new()
@@ -74,7 +76,7 @@ func _build_screen() -> void:
 	_camera_state = camera_card.get_node("State")
 	content.add_child(camera_card)
 
-	var audio_card := _make_permission_card("🎙", "Áudio (microfone)", "Áudio não é utilizado nesta versão; a permissão não será solicitada.")
+	var audio_card := _make_permission_card("🎙", "Áudio (microfone)", "O microfone não é utilizado; nenhum acesso será solicitado.")
 	_audio_state = audio_card.get_node("State")
 	content.add_child(audio_card)
 
@@ -119,12 +121,12 @@ func _make_permission_card(icon_text: String, permission_name: String, descripti
 func _on_continue_pressed() -> void:
 	if _finished:
 		return
-	_update_states()
-	if _camera_is_granted() or _plugin == null:
+	if _camera_is_granted() or _plugin == null or _continue_without_camera:
 		_finish()
 		return
-	if _camera_request_pending:
+	if _camera_request_pending or _camera_request_attempted:
 		return
+	_camera_request_attempted = true
 	_plugin.request_camera_permission()
 	_camera_request_pending = true
 	_request_elapsed = 0.0
@@ -138,11 +140,11 @@ func _camera_is_granted() -> bool:
 func _update_states() -> void:
 	if _camera_state != null:
 		if _plugin == null:
-			_camera_state.text = "Indisponível: plugin Android de câmera ausente" if OS.has_feature("android") else "Disponível somente no Android"
+			_camera_state.text = "Plugin Android indisponível" if OS.has_feature("android") else "Disponível somente no Android"
 		else:
 			_camera_state.text = "Concedida" if _camera_is_granted() else "Não concedida"
 	if _audio_state != null:
-		_audio_state.text = "Não solicitada (áudio não utilizado)"
+		_audio_state.text = "Não solicitada (microfone não utilizado)"
 
 func _has_completed_intro() -> bool:
 	var config := ConfigFile.new()
