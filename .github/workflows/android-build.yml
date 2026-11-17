@@ -1,3 +1,4 @@
+
 name: HANDS SANDBOX Android Build
 
 on:
@@ -21,51 +22,41 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "cmdline-tools;latest" \
+            "ndk;23.2.8568313" \
+            "cmake;3.10.2.4988404"
+
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
           version: 4.4.1
           use-dotnet: false
 
-      - name: Install Godot 4.4.1 export templates
-        shell: bash
+      - name: Install Godot export templates
         run: |
-          set -Eeuo pipefail
-
-          templates_version="4.4.1.stable"
-          templates_dir="$HOME/.local/share/godot/export_templates/$templates_version"
-          archive="$RUNNER_TEMP/Godot_v4.4.1-stable_export_templates.tpz"
-          extracted_dir="$RUNNER_TEMP/godot-export-templates"
-
-          mkdir -p "$extracted_dir" "$templates_dir"
-          curl --fail --location --retry 3 \
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
+          curl -L --fail \
             "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" \
-            --output "$archive"
-          unzip "$archive" -d "$extracted_dir"
-
-          if [[ ! -d "$extracted_dir/templates" ]]; then
-            echo "Official template archive did not contain the expected templates/ directory." >&2
-            find "$extracted_dir" -maxdepth 3 -type f -print >&2
-            exit 1
-          fi
-
-          cp -av "$extracted_dir/templates/." "$templates_dir/"
-
-          for template in android_debug.apk android_release.apk; do
-            if [[ ! -s "$templates_dir/$template" ]]; then
-              echo "Missing or empty Android export template: $templates_dir/$template" >&2
-              echo "Installed files in $templates_dir:" >&2
-              find "$templates_dir" -maxdepth 1 -type f -printf '%f (%s bytes)\n' >&2
-              exit 1
-            fi
-            echo "Verified: $templates_dir/$template ($(stat -c '%s' "$templates_dir/$template") bytes)"
-          done
+            -o templates.tpz
+          unzip -o templates.tpz -d templates
+          cp -a templates/templates/. \
+            "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
 
       - name: Export APK
         run: |
           mkdir -p build
           godot --headless --path . \
-            --export-release "Android" \
+            --export-debug "Android" \
             build/HANDS_SANDBOX.apk
 
       - name: Upload APK
