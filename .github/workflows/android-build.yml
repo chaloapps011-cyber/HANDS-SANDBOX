@@ -26,15 +26,39 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager \
+          set -e
+
+          echo "Android SDK: $ANDROID_HOME"
+          echo "Java SDK: $JAVA_HOME"
+
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+
+          sdkmanager --sdk_root="$ANDROID_HOME" \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "cmdline-tools;latest" \
             "ndk;23.2.8568313" \
             "cmake;3.10.2.4988404"
+
+      - name: Configure Godot Android paths
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p "$HOME/.config/godot"
+
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          EOF
+
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
 
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
@@ -43,24 +67,47 @@ jobs:
           use-dotnet: false
 
       - name: Install Godot export templates
+        shell: bash
         run: |
-          mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
-          curl -L --fail \
+          set -e
+
+          VERSION="4.4.1.stable"
+          DEST="$HOME/.local/share/godot/export_templates/$VERSION"
+
+          mkdir -p "$RUNNER_TEMP/templates" "$DEST"
+
+          curl --fail --location --retry 3 \
             "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" \
-            -o templates.tpz
-          unzip -o templates.tpz -d templates
-          cp -a templates/templates/. \
-            "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
+            -o "$RUNNER_TEMP/templates.tpz"
+
+          unzip -o "$RUNNER_TEMP/templates.tpz" \
+            -d "$RUNNER_TEMP/templates"
+
+          cp -a "$RUNNER_TEMP/templates/templates/." "$DEST/"
+
+          test -s "$DEST/android_debug.apk"
+          test -s "$DEST/android_release.apk"
+
+          echo "Godot Android templates installed."
 
       - name: Export APK
+        shell: bash
         run: |
+          set -e
+
           mkdir -p build
-          godot --headless --path . \
+
+          godot --headless --verbose --path . \
             --export-debug "Android" \
             build/HANDS_SANDBOX.apk
+
+          test -s build/HANDS_SANDBOX.apk
+
+          echo "APK generated successfully."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HANDS-SANDBOX-APK
           path: build/HANDS_SANDBOX.apk
+          if-no-files-found: error
