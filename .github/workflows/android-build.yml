@@ -31,8 +31,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # This input is space-separated. Do not use a YAML multiline literal here:
-          # setup-android passes the value to sdkmanager as a single package name.
+          # Folded YAML joins these entries with spaces for sdkmanager.
           packages: >-
             platform-tools
             platforms;android-34
@@ -100,14 +99,14 @@ jobs:
           trap 'status=$?; echo "Godot Android path configuration failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
 
           mkdir -p "$HOME/.config/godot"
-          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
           export/android/java_sdk_path = "$JAVA_HOME"
           export/android/android_sdk_path = "$ANDROID_HOME"
           EOF
-          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+          cat "$HOME/.config/godot/editor_settings-4.tres"
           godot --version
 
       - name: Validate Android export preset
@@ -122,21 +121,23 @@ jobs:
           grep -Fx 'package/unique_name="com.chaloapps.handsandbox"' export_presets.cfg
           echo "Android preset name, package ID, and arm64-v8a architecture verified."
 
-      - name: Export release APK
+      - name: Export debug APK
         shell: bash
         run: |
           set -Eeuo pipefail
-          trap 'status=$?; echo "Godot Android release export failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
+          trap 'status=$?; echo "Godot Android debug export failed (exit $status) at line $LINENO" >&2; exit "$status"' ERR
 
           mkdir -p build
           godot --headless --verbose --path . \
-            --export-release "Android" \
+            --export-debug "Android" \
             build/HANDS_SANDBOX.apk
 
           test -s build/HANDS_SANDBOX.apk
+          unzip -t build/HANDS_SANDBOX.apk
+          "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION/aapt" dump badging build/HANDS_SANDBOX.apk | grep -F "package: name='com.chaloapps.handsandbox'"
           file build/HANDS_SANDBOX.apk
           sha256sum build/HANDS_SANDBOX.apk
-          echo "Release APK successfully generated."
+          echo "Debug APK export and validation completed."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
